@@ -9,22 +9,47 @@ export default function CompetitionForm() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState({ type: '', text: '' });
+    const [hasActive, setHasActive] = useState(false); // Есть ли активное соревнование?
 
-    // Загрузка существующего соревнования
+    // Загрузка активного соревнования при открытии
     useEffect(() => {
         const fetchCompetition = async () => {
             try {
                 const response = await fetch('http://localhost:5000/api/competition');
                 const data = await response.json();
+
                 if (data.competition) {
+                    // Надёжное форматирование даты в YYYY-MM-DD (локальное)
+                    const formatDate = (date) => {
+                        if (!date) return '';
+                        const d = new Date(date);
+                        // Защита от invalid date
+                        if (isNaN(d.getTime())) return '';
+                        return [
+                            d.getFullYear(),
+                            String(d.getMonth() + 1).padStart(2, '0'),
+                            String(d.getDate()).padStart(2, '0')
+                        ].join('-');
+                    };
+
+                    console.log('Raw dates from API:', {
+                        start: data.competition.CompetitionStartDate,
+                        end: data.competition.CompetitionEndDate,
+                        typeStart: typeof data.competition.CompetitionStartDate,
+                        typeEnd: typeof data.competition.CompetitionEndDate
+                    });
+
                     setFormData({
                         CompetitionName: data.competition.CompetitionName || '',
-                        CompetitionStartDate: data.competition.CompetitionStartDate || '',
-                        CompetitionEndDate: data.competition.CompetitionEndDate || ''
+                        CompetitionStartDate: formatDate(data.competition.CompetitionStartDate),
+                        CompetitionEndDate: formatDate(data.competition.CompetitionEndDate)
                     });
+                    setHasActive(true);
+                } else {
+                    setHasActive(false);
                 }
             } catch (err) {
-                showMessage('error', 'Не удалось загрузить данные соревнования');
+                showMessage('error', 'Не удалось загрузить соревнование');
             } finally {
                 setLoading(false);
             }
@@ -59,6 +84,9 @@ export default function CompetitionForm() {
 
             if (response.ok) {
                 showMessage('success', data.message);
+                if (data.action === 'create') {
+                    setHasActive(true); // Теперь есть активное
+                }
             } else {
                 showMessage('error', data.error || 'Ошибка при сохранении');
             }
@@ -75,7 +103,9 @@ export default function CompetitionForm() {
 
     return (
         <div>
-            <h2 style={{ fontSize: '20px', marginBottom: '16px' }}>Создание соревнования</h2>
+            <h2 style={{ fontSize: '20px', marginBottom: '16px' }}>
+                {hasActive ? 'Редактирование соревнования' : 'Создание нового соревнования'}
+            </h2>
 
             {message.text && (
                 <div style={{
@@ -166,7 +196,7 @@ export default function CompetitionForm() {
                         marginTop: '16px'
                     }}
                 >
-                    {saving ? 'Сохранение...' : 'Сохранить соревнование'}
+                    {saving ? 'Сохранение...' : hasActive ? 'Сохранить изменения' : 'Создать соревнование'}
                 </button>
             </form>
         </div>
