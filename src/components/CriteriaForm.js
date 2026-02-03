@@ -1,15 +1,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
 
 export default function CriteriaForm() {
-    const [criteria, setCriteria] = useState([]); // [{ id, name, maxScore, weight (bool) }, ...]
+    const [criteria, setCriteria] = useState([]); // существующие критерии (с id)
     const [newCriteriaInput, setNewCriteriaInput] = useState('');
-    const [newCriteriaList, setNewCriteriaList] = useState([]);
+    const [newCriteriaList, setNewCriteriaList] = useState([]); // новые (только названия)
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState({ type: '', text: '' });
     const [hasCompetition, setHasCompetition] = useState(true);
 
-    // Перезагрузка данных
     const loadCriteria = useCallback(async () => {
         try {
             const response = await fetch('http://localhost:5000/api/criteria');
@@ -18,12 +17,15 @@ export default function CriteriaForm() {
             setCriteria(data.criteria.map(c => ({
                 id: c.idCriteria,
                 name: c.CriteriaName,
-                maxScore: c.maxScore !== null ? String(c.maxScore) : '',
-                weight: c.weight === 1 || c.weight === '1' // → true/false
+                maxScore: c.maxScore != null ? String(c.maxScore) : '',
+                weight: c.weight === 1 || c.weight === '1' || c.weight === true
             })));
             setHasCompetition(data.hasCompetition);
         } catch (err) {
+            console.error('❌ Ошибка загрузки критериев:', err);
             showMessage('error', 'Не удалось загрузить критерии');
+        } finally {
+            setLoading(false);
         }
     }, []);
 
@@ -37,7 +39,6 @@ export default function CriteriaForm() {
     const handleInputChange = (index, field, value) => {
         const updated = [...criteria];
         if (field === 'maxScore') {
-            // Только цифры 1–100
             const num = value === '' ? '' : Math.min(100, Math.max(1, parseInt(value))) || '';
             updated[index] = { ...updated[index], maxScore: String(num) };
         } else if (field === 'weight') {
@@ -63,7 +64,7 @@ export default function CriteriaForm() {
         try {
             const response = await fetch(`http://localhost:5000/api/criteria/${id}`, { method: 'DELETE' });
             if (response.ok) {
-                await loadCriteria(); // ← обновляем список!
+                await loadCriteria();
                 showMessage('success', 'Критерий удалён');
             } else {
                 showMessage('error', 'Ошибка при удалении');
@@ -73,16 +74,24 @@ export default function CriteriaForm() {
         }
     };
 
-    // Считаем сумму баллов
     const totalScore = criteria.reduce((sum, c) => sum + (parseInt(c.maxScore) || 0), 0);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!hasCompetition) return showMessage('error', 'Сначала создайте соревнование');
-        if (criteria.length === 0) return showMessage('error', 'Добавьте хотя бы один критерий');
 
-        if (totalScore !== 100) {
-            return showMessage('error', `Сумма баллов должна быть 100. Сейчас: ${totalScore}`);
+        if (newCriteriaList.length === 0 && criteria.length === 0) {
+            return showMessage('error', 'Добавьте хотя бы один критерий');
+        }
+
+        // Если есть только новые — сохраняем без проверки суммы
+        if (criteria.length === 0 && newCriteriaList.length > 0) {
+            // OK — можно сохранять
+        } else if (criteria.length > 0) {
+            // Если есть существующие — проверяем сумму
+            if (totalScore !== 100) {
+                return showMessage('error', `Сумма баллов должна быть 100. Сейчас: ${totalScore}`);
+            }
         }
 
         setSaving(true);
@@ -97,7 +106,7 @@ export default function CriteriaForm() {
                         id: c.id,
                         name: c.name,
                         maxScore: c.maxScore,
-                        weight: c.weight // boolean → сервер сам конвертирует
+                        weight: c.weight
                     })),
                     newCriteria: newCriteriaList
                 })
@@ -106,12 +115,13 @@ export default function CriteriaForm() {
             const data = await response.json();
             if (response.ok) {
                 showMessage('success', data.message);
-                setNewCriteriaList([]); // очищаем новые
-                await loadCriteria();    // ← КЛЮЧЕВОЕ: перезагружаем данные!
+                setNewCriteriaList([]);
+                await loadCriteria();
             } else {
                 showMessage('error', data.error || 'Ошибка при сохранении');
             }
         } catch (err) {
+            console.error('❌ Ошибка сохранения:', err);
             showMessage('error', 'Нет связи с сервером');
         } finally {
             setSaving(false);
@@ -173,47 +183,88 @@ export default function CriteriaForm() {
                         </button>
                     </div>
 
+                    {/* Новые критерии */}
                     {newCriteriaList.length > 0 && (
-                        <div style={{ marginBottom: '12px' }}>
-                            <p style={{ fontSize: '14px', color: '#6B7280', marginBottom: '4px' }}>Новые:</p>
+                        <div style={{ marginBottom: '16px' }}>
+                            <p style={{ fontSize: '14px', color: '#6B7280', marginBottom: '8px' }}>Новые критерии:</p>
                             {newCriteriaList.map((name, i) => (
                                 <div key={i} style={{
                                     display: 'flex',
                                     justifyContent: 'space-between',
                                     padding: '6px 12px',
-                                    backgroundColor: '#EEF2FF',
+                                    backgroundColor: '#DBEAFE',
                                     borderRadius: '4px',
-                                    marginBottom: '4px'
+                                    marginBottom: '6px',
+                                    borderLeft: '4px solid #4F46E5'
                                 }}>
                                     <span>{name}</span>
-                                    <button type="button" onClick={() => handleRemoveNewCriteria(i)} style={{ background: 'none', border: 'none', color: '#EF4444', fontSize: '18px' }}>&times;</button>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleRemoveNewCriteria(i)}
+                                        style={{ background: 'none', border: 'none', color: '#EF4444', fontSize: '18px' }}
+                                    >
+                                        &times;
+                                    </button>
                                 </div>
                             ))}
                         </div>
                     )}
 
+                    {/* Существующие критерии */}
                     {criteria.length > 0 && (
                         <div>
-                            <p style={{ fontSize: '14px', color: '#6B7280', marginBottom: '8px' }}>Существующие:</p>
+                            <p style={{ fontSize: '14px', color: '#6B7280', marginBottom: '8px' }}>Существующие критерии:</p>
                             {criteria.map((crit, i) => (
-                                <div key={crit.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                                    <span style={{ flex: 1, padding: '8px 12px', backgroundColor: '#F9FAFB', borderRadius: '4px' }}>{crit.name}</span>
-                                    <button type="button" onClick={() => handleRemoveExisting(crit.id, i)} style={{ background: 'none', border: 'none', color: '#EF4444', fontSize: '18px' }}>&times;</button>
+                                <div key={crit.id} style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '8px',
+                                    marginBottom: '8px',
+                                    padding: '6px 12px',
+                                    backgroundColor: '#F9FAFB',
+                                    borderRadius: '4px',
+                                    borderLeft: '4px solid #D1D5DB'
+                                }}>
+                                    <span style={{ flex: 1 }}>{crit.name}</span>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleRemoveExisting(crit.id, i)}
+                                        style={{ background: 'none', border: 'none', color: '#EF4444', fontSize: '18px' }}
+                                    >
+                                        &times;
+                                    </button>
                                 </div>
                             ))}
                         </div>
+                    )}
+
+                    {criteria.length === 0 && newCriteriaList.length === 0 && (
+                        <p style={{ color: '#9CA3AF' }}>Нет критериев. Добавьте новый выше.</p>
                     )}
                 </div>
 
                 {/* Параметры */}
                 <div>
                     <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '12px' }}>
-                        Параметры (сумма баллов: <strong style={{ color: totalScore === 100 ? '#10B981' : '#EF4444' }}>{totalScore}/100</strong>)
+                        Параметры для текущего соревнования
+                        {criteria.length > 0 && (
+                            <span style={{ fontSize: '14px', color: '#6B7280', marginLeft: '8px' }}>
+                (сумма: <strong style={{ color: totalScore === 100 ? '#10B981' : '#EF4444' }}>{totalScore}/100</strong>)
+              </span>
+                        )}
                     </h3>
 
-                    {criteria.length === 0 ? (
-                        <p>Добавьте критерии, чтобы задать параметры.</p>
-                    ) : (
+                    {criteria.length === 0 && newCriteriaList.length > 0 && (
+                        <p style={{ fontSize: '14px', color: '#6B7280', marginBottom: '12px' }}>
+                            После сохранения новые критерии появятся здесь, и вы сможете задать параметры.
+                        </p>
+                    )}
+
+                    {criteria.length === 0 && newCriteriaList.length === 0 && (
+                        <p style={{ color: '#9CA3AF' }}>Добавьте критерии, чтобы задать параметры.</p>
+                    )}
+
+                    {criteria.length > 0 && (
                         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                             <thead>
                             <tr>
@@ -261,7 +312,7 @@ export default function CriteriaForm() {
                         </table>
                     )}
 
-                    {totalScore !== 100 && criteria.length > 0 && (
+                    {criteria.length > 0 && totalScore !== 100 && (
                         <div style={{ marginTop: '12px', padding: '10px', backgroundColor: '#FEF2F2', borderRadius: '4px', color: '#DC2626', fontSize: '14px' }}>
                             ⚠️ Сумма баллов должна быть ровно 100 для сохранения.
                         </div>
@@ -270,11 +321,17 @@ export default function CriteriaForm() {
 
                 <button
                     type="submit"
-                    disabled={saving || totalScore !== 100 || criteria.length === 0}
+                    disabled={
+                        saving ||
+                        (newCriteriaList.length === 0 && criteria.length === 0) ||
+                        (criteria.length > 0 && totalScore !== 100)
+                    }
                     style={{
-                        backgroundColor: (saving || totalScore !== 100 || criteria.length === 0)
-                            ? '#D1D5DB'
-                            : '#4F46E5',
+                        backgroundColor: (
+                            saving ||
+                            (newCriteriaList.length === 0 && criteria.length === 0) ||
+                            (criteria.length > 0 && totalScore !== 100)
+                        ) ? '#D1D5DB' : '#4F46E5',
                         color: 'white',
                         border: 'none',
                         padding: '12px 24px',

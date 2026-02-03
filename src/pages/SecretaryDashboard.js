@@ -43,7 +43,7 @@ function SecretaryDashboard() {
                     </h1>
                     {user && (
                         <p style={{ color: '#6B7280', fontSize: '14px' }}>
-                            Привет, {user.surname} {user.name.charAt(0)}. {user.role}
+                            Здравствуйте, {user.surname} {user.name.charAt(0)}. {user.role}
                         </p>
                     )}
                 </header>
