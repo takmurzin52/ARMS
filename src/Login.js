@@ -15,11 +15,9 @@ function Login() {
             return;
         }
 
-        setError(''); // очищаем прошлую ошибку
+        setError('');
 
         try {
-            console.log('Попытка входа:', { login, password });
-
             const response = await fetch('http://localhost:5000/api/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -29,14 +27,22 @@ function Login() {
             const data = await response.json();
 
             if (response.ok) {
-                // Сохраняем пользователя (например id и имя)
+                // Сохраняем ПОЛНЫЕ данные пользователя (включая роль)
                 localStorage.setItem('user', JSON.stringify(data.user));
 
-                navigate('/dashboard');
+                // Перенаправляем в зависимости от роли
+                if (data.user.role === 'Секретарь') {
+                    navigate('/dashboard');
+                } else if (data.user.role === 'Основной судья') {
+                    navigate('/judge');
+                } else if (data.user.role === 'Главный судья') {
+                    navigate('/chief'); // пока не реализовано
+                } else {
+                    navigate('/unauthorized');
+                }
             } else {
                 setError(data.error || 'Ошибка входа');
             }
-
         } catch (err) {
             console.error(err);
             setError('Сервер недоступен. Попробуйте позже.');

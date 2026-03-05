@@ -122,7 +122,7 @@ export default function MembersManager() {
         setNewMember(prev => ({ ...prev, [field]: value }));
     };
 
-    if (loading && teams.length === 0) return <div style={{ padding: '20px' }}>Загрузка...</div>;
+    /* if (loading && teams.length === 0) return <div style={{ padding: '20px' }}>Загрузка...</div>; */
     if (!hasCompetition) return <div style={{ padding: '20px', color: '#EF4444' }}>❗ Создайте соревнование.</div>;
     if (teams.length === 0) return <div style={{ padding: '20', color: '#9CA3AF' }}>❗ Сначала добавьте команды в разделе «Команды».</div>;
 

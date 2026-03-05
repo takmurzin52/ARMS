@@ -4,6 +4,7 @@ export default function CriteriaForm() {
     const [criteria, setCriteria] = useState([]); // существующие критерии (с id)
     const [newCriteriaInput, setNewCriteriaInput] = useState('');
     const [newCriteriaList, setNewCriteriaList] = useState([]); // новые (только названия)
+    const [saveStatus, setSaveStatus] = useState('unsaved'); // 'unsaved' | 'saved'
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState({ type: '', text: '' });
@@ -13,12 +14,12 @@ export default function CriteriaForm() {
         try {
             const response = await fetch('http://localhost:5000/api/criteria');
             const data = await response.json();
-
             setCriteria(data.criteria.map(c => ({
                 id: c.idCriteria,
                 name: c.CriteriaName,
                 maxScore: c.maxScore != null ? String(c.maxScore) : '',
-                weight: c.weight === 1 || c.weight === '1' || c.weight === true
+                weight: c.weight === 1 || c.weight === '1' || c.weight === true,
+                description: c.description || ''
             })));
             setHasCompetition(data.hasCompetition);
         } catch (err) {
@@ -43,8 +44,11 @@ export default function CriteriaForm() {
             updated[index] = { ...updated[index], maxScore: String(num) };
         } else if (field === 'weight') {
             updated[index] = { ...updated[index], weight: value };
+        } else if (field === 'description') {
+            updated[index] = { ...updated[index], description: value };
         }
         setCriteria(updated);
+        setSaveStatus('unsaved');
     };
 
     const handleAddNewCriteria = () => {
@@ -52,20 +56,22 @@ export default function CriteriaForm() {
         if (!name) return;
         setNewCriteriaList(prev => [...prev, name]);
         setNewCriteriaInput('');
+        setSaveStatus('unsaved');
     };
 
     const handleRemoveNewCriteria = (index) => {
         setNewCriteriaList(prev => prev.filter((_, i) => i !== index));
+        setSaveStatus('unsaved');
     };
 
     const handleRemoveExisting = async (id, index) => {
         if (!window.confirm('Удалить критерий? Все данные по нему будут потеряны.')) return;
-
         try {
             const response = await fetch(`http://localhost:5000/api/criteria/${id}`, { method: 'DELETE' });
             if (response.ok) {
                 await loadCriteria();
                 showMessage('success', 'Критерий удалён');
+                setSaveStatus('unsaved');
             } else {
                 showMessage('error', 'Ошибка при удалении');
             }
@@ -79,19 +85,19 @@ export default function CriteriaForm() {
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!hasCompetition) return showMessage('error', 'Сначала создайте соревнование');
-
         if (newCriteriaList.length === 0 && criteria.length === 0) {
             return showMessage('error', 'Добавьте хотя бы один критерий');
         }
 
-        // Если есть только новые — сохраняем без проверки суммы
-        if (criteria.length === 0 && newCriteriaList.length > 0) {
-            // OK — можно сохранять
-        } else if (criteria.length > 0) {
-            // Если есть существующие — проверяем сумму
-            if (totalScore !== 100) {
-                return showMessage('error', `Сумма баллов должна быть 100. Сейчас: ${totalScore}`);
-            }
+        // Если есть существующие — проверяем сумму
+        if (criteria.length > 0 && totalScore !== 100) {
+            return showMessage('error', `Сумма баллов должна быть 100. Сейчас: ${totalScore}`);
+        }
+
+        // Проверка описания у существующих критериев
+        const missingDesc = criteria.find(c => !c.description?.trim());
+        if (missingDesc) {
+            return showMessage('error', 'Заполните описание всех критериев!');
         }
 
         setSaving(true);
@@ -106,7 +112,8 @@ export default function CriteriaForm() {
                         id: c.id,
                         name: c.name,
                         maxScore: c.maxScore,
-                        weight: c.weight
+                        weight: c.weight,
+                        description: c.description || ''
                     })),
                     newCriteria: newCriteriaList
                 })
@@ -115,14 +122,18 @@ export default function CriteriaForm() {
             const data = await response.json();
             if (response.ok) {
                 showMessage('success', data.message);
+                // ✅ Ключевое: сначала очищаем новые критерии, потом перезагружаем
                 setNewCriteriaList([]);
                 await loadCriteria();
+                setSaveStatus('saved');
             } else {
                 showMessage('error', data.error || 'Ошибка при сохранении');
+                setSaveStatus('unsaved');
             }
         } catch (err) {
             console.error('❌ Ошибка сохранения:', err);
             showMessage('error', 'Нет связи с сервером');
+            setSaveStatus('unsaved');
         } finally {
             setSaving(false);
         }
@@ -152,7 +163,6 @@ export default function CriteriaForm() {
                 {/* Общие критерии */}
                 <div style={{ marginBottom: '24px' }}>
                     <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '12px' }}>Общие критерии</h3>
-
                     <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
                         <input
                             type="text"
@@ -271,6 +281,7 @@ export default function CriteriaForm() {
                                 <th style={{ textAlign: 'left', padding: '8px', borderBottom: '2px solid #E5E7EB' }}>Критерий</th>
                                 <th style={{ textAlign: 'center', padding: '8px', borderBottom: '2px solid #E5E7EB' }}>Макс. балл (1–100)</th>
                                 <th style={{ textAlign: 'center', padding: '8px', borderBottom: '2px solid #E5E7EB' }}>Тип</th>
+                                <th style={{ textAlign: 'left', padding: '8px', borderBottom: '2px solid #E5E7EB' }}>Описание</th>
                             </tr>
                             </thead>
                             <tbody>
@@ -306,6 +317,22 @@ export default function CriteriaForm() {
                         </span>
                                         </label>
                                     </td>
+                                    <td style={{ padding: '10px', borderBottom: '1px solid #F3F4F6' }}>
+                      <textarea
+                          rows="2"
+                          value={crit.description}
+                          onChange={(e) => handleInputChange(i, 'description', e.target.value)}
+                          placeholder="Описание критерия для этого соревнования..."
+                          style={{
+                              width: '100%',
+                              padding: '6px',
+                              border: '1px solid #D1D5DB',
+                              borderRadius: '4px',
+                              fontSize: '14px',
+                              resize: 'vertical'
+                          }}
+                      />
+                                    </td>
                                 </tr>
                             ))}
                             </tbody>
@@ -324,25 +351,26 @@ export default function CriteriaForm() {
                     disabled={
                         saving ||
                         (newCriteriaList.length === 0 && criteria.length === 0) ||
-                        (criteria.length > 0 && totalScore !== 100)
+                        (criteria.length > 0 && totalScore !== 100) ||
+                        saveStatus === 'saved'
                     }
                     style={{
-                        backgroundColor: (
+                        backgroundColor: saveStatus === 'saved' ? '#D1D5DB' : (
                             saving ||
                             (newCriteriaList.length === 0 && criteria.length === 0) ||
                             (criteria.length > 0 && totalScore !== 100)
                         ) ? '#D1D5DB' : '#4F46E5',
-                        color: 'white',
+                        color: saveStatus === 'saved' ? '#6B7280' : 'white',
                         border: 'none',
                         padding: '12px 24px',
                         borderRadius: '4px',
-                        cursor: 'pointer',
+                        cursor: saveStatus === 'saved' ? 'not-allowed' : 'pointer',
                         fontWeight: '500',
                         fontSize: '16px',
                         marginTop: '20px'
                     }}
                 >
-                    {saving ? 'Сохранение...' : 'Сохранить критерии'}
+                    {saveStatus === 'saved' ? 'Сохранить критерии' : (saving ? 'Сохранение...' : 'Сохранить критерии')}
                 </button>
             </form>
         </div>

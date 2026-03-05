@@ -2,11 +2,11 @@ import React from 'react';
 
 function Sidebar({ activeSection, setActiveSection }) {
     const menuItems = [
-        { id: 'competition', label: '1) Соревнование' },
-        { id: 'task', label: '2) Задание' },
-        { id: 'criteria', label: '3) Критерии' },
-        { id: 'teams', label: '4) Команды' },
-        { id: 'members', label: '5) Участники' },
+        { id: 'competition', label: 'Соревнование' },
+        { id: 'task', label: 'Задание' },
+        { id: 'criteria', label: 'Критерии' },
+        { id: 'teams', label: 'Команды' },
+        { id: 'members', label: 'Участники' },
     ];
 
     return (
