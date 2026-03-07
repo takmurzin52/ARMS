@@ -122,9 +122,8 @@ export default function CriteriaForm() {
             const data = await response.json();
             if (response.ok) {
                 showMessage('success', data.message);
-                // ✅ Ключевое: сначала очищаем новые критерии, потом перезагружаем
-                setNewCriteriaList([]);
                 await loadCriteria();
+                setNewCriteriaList([]);
                 setSaveStatus('saved');
             } else {
                 showMessage('error', data.error || 'Ошибка при сохранении');

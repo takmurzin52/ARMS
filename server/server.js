@@ -257,7 +257,7 @@ app.get('/api/criteria', async (req, res) => {
         const compId = compRows.length > 0 ? compRows[0].idCompetition : null;
 
         // 2. Все общие критерии
-        const [criteriaRows] = await pool.execute('SELECT * FROM Criteria ORDER BY CriteriaName');
+        const [criteriaRows] = await pool.execute('SELECT * FROM Criteria ORDER BY idCriteria');
 
         // 3. Параметры для активного соревнования (только если оно есть)
         let compCriteria = [];
@@ -265,6 +265,7 @@ app.get('/api/criteria', async (req, res) => {
             [compCriteria] = await pool.execute(`
                 SELECT
                     cc.idCompetition_Criteria AS id,
+                    cc.Criteria_idCriteria,
                     c.CriteriaName,
                     cc.Competition_CriteriaMaxScore,
                     cc.Competition_CriteriaWeight,
@@ -377,22 +378,20 @@ app.post('/api/criteria', async (req, res) => {
                 throw new Error(`Сумма баллов должна быть 100. Сейчас: ${totalScore}`);
             }
 
-            // 5. Удаляем старые параметры
-            await connection.execute(
-                'DELETE FROM Competition_Criteria WHERE Competition_idCompetition = ?',
-                [compId]
-            );
-
-            // 6. Вставляем Competition_Criteria
+            // Вместо DELETE + INSERT для всех:
             for (const item of allCriteria) {
                 await connection.execute(
                     `INSERT INTO Competition_Criteria
                      (Competition_CriteriaMaxScore, Competition_CriteriaWeight, Criteria_idCriteria, Competition_idCompetition, Competition_CriteriaDescription)
-                     VALUES (?, ?, ?, ?, ?)`,
+                     VALUES (?, ?, ?, ?, ?)
+                     ON DUPLICATE KEY UPDATE
+                     Competition_CriteriaMaxScore = VALUES(Competition_CriteriaMaxScore),
+                     Competition_CriteriaWeight = VALUES(Competition_CriteriaWeight),
+                     Competition_CriteriaDescription = VALUES(Competition_CriteriaDescription)`,
                     [
                         item.maxScore,
                         item.weight ? 1 : 0,
-                        item.id,
+                        item.id,          // ← это idCriteria (из фронта)
                         compId,
                         item.description?.trim() || 'Описание критерия'
                     ]
@@ -458,7 +457,7 @@ app.get('/api/teams', async (req, res) => {
         const compId = compRows[0].idCompetition;
 
         const [teams] = await pool.execute(
-            'SELECT idTeam, TeamName FROM Team WHERE Competition_idCompetition = ? ORDER BY TeamName',
+            'SELECT idTeam, TeamName FROM Team WHERE Competition_idCompetition = ? ORDER BY idTeam',
             [compId]
         );
 
@@ -569,7 +568,7 @@ app.get('/api/teams/simple', async (req, res) => {
         const compId = compRows[0].idCompetition;
 
         const [teams] = await pool.execute(
-            'SELECT idTeam, TeamName FROM Team WHERE Competition_idCompetition = ? ORDER BY TeamName',
+            'SELECT idTeam, TeamName FROM Team WHERE Competition_idCompetition = ? ORDER BY idTeam',
             [compId]
         );
 
