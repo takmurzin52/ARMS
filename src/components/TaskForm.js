@@ -131,7 +131,7 @@ export default function TaskForm() {
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <div>
                     <label htmlFor="TaskName" style={{ display: 'block', marginBottom: '4px', fontWeight: '500' }}>
-                        Название задания *
+                        Название задания
                     </label>
                     <input
                         id="TaskName"
@@ -151,7 +151,7 @@ export default function TaskForm() {
 
                 <div>
                     <label htmlFor="TaskCustomer" style={{ display: 'block', marginBottom: '4px', fontWeight: '500' }}>
-                        Заказчик *
+                        Заказчик
                     </label>
                     <input
                         id="TaskCustomer"
@@ -171,7 +171,7 @@ export default function TaskForm() {
 
                 <div>
                     <label htmlFor="TaskDescription" style={{ display: 'block', marginBottom: '4px', fontWeight: '500' }}>
-                        Описание задания *
+                        Описание задания
                     </label>
                     <textarea
                         id="TaskDescription"

@@ -173,7 +173,7 @@ export default function MembersManager() {
                 <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '12px' }}>Добавить участника</h3>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                     <div>
-                        <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px' }}>Фамилия *</label>
+                        <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px' }}>Фамилия</label>
                         <input
                             type="text"
                             value={newMember.surname}
@@ -183,7 +183,7 @@ export default function MembersManager() {
                         />
                     </div>
                     <div>
-                        <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px' }}>Имя *</label>
+                        <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px' }}>Имя</label>
                         <input
                             type="text"
                             value={newMember.name}
@@ -193,7 +193,7 @@ export default function MembersManager() {
                         />
                     </div>
                     <div>
-                        <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px' }}>Email *</label>
+                        <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px' }}>Email</label>
                         <input
                             type="email"
                             value={newMember.email}
@@ -203,7 +203,7 @@ export default function MembersManager() {
                         />
                     </div>
                     <div>
-                        <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px' }}>Роль в команде *</label>
+                        <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px' }}>Роль в команде</label>
                         <input
                             type="text"
                             value={newMember.role}

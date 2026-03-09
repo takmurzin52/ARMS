@@ -722,7 +722,7 @@ app.post('/api/judge/teams', async (req, res) => {
             FROM Criteria c
                      JOIN Competition_Criteria cc ON c.idCriteria = cc.Criteria_idCriteria
             WHERE cc.Competition_idCompetition = ?
-            ORDER BY c.CriteriaName
+            ORDER BY c.idCriteria
         `, [compId]);
 
         // Оценки судьи
@@ -749,23 +749,34 @@ app.post('/api/judge/teams', async (req, res) => {
         for (const team of teams) {
             // Запрос результатов ТОЛЬКО для текущей команды
             const [results] = await pool.execute(`
-        SELECT
-          r.ResultsInstruction,
-          r.ResultsScoreForCoreFunc,
-          r.ResultsScoreForAddFunc,
-          r.ResultsFinalGrade,
-          r.ResultsTotalScore
-        FROM Results r
-        WHERE r.Competition_idCompetition = ? AND r.Team_idTeam = ?
-      `, [compId, team.idTeam]);
-
+                SELECT
+                    r.ResultsInstruction,
+                    r.ResultsScoreForCoreFunc,
+                    r.ResultsScoreForAddFunc,
+                    r.ResultsFinalGrade,
+                    r.ResultsTotalScore
+                FROM Results r
+                WHERE r.Competition_idCompetition = ? AND r.Team_idTeam = ?
+            `, [compId, team.idTeam]);
             const teamResult = results[0] || {};
             const teamGrades = grades.filter(g => g.Team_idTeam === team.idTeam);
             const teamComment = comments.find(c => c.Team_idTeam === team.idTeam);
-
             const criteriaGrades = {};
             teamGrades.forEach(g => {
                 criteriaGrades[g.Competition_Criteria_idCompetition_Criteria] = g.GradesGrade;
+            });
+
+            const [critDescs] = await pool.execute(`
+                SELECT
+                    cc.idCompetition_Criteria,
+                    cc.Competition_CriteriaDescription
+                FROM Competition_Criteria cc
+                WHERE cc.Competition_idCompetition = ?
+            `, [compId]);
+
+            const descriptionMap = {};
+            critDescs.forEach(row => {
+                descriptionMap[row.idCompetition_Criteria] = row.Competition_CriteriaDescription || '';
             });
 
             teamData.push({
@@ -777,7 +788,8 @@ app.post('/api/judge/teams', async (req, res) => {
                 addFunc: teamResult.ResultsScoreForAddFunc || null,
                 finalGrade: teamResult.ResultsFinalGrade || null,
                 totalScore: teamResult.ResultsTotalScore || null,
-                comment: teamComment?.CommentaryText || ''
+                comment: teamComment?.CommentaryText || '',
+                criteriaDescriptions: descriptionMap
             });
         }
 
@@ -930,7 +942,7 @@ app.post('/api/judge/team/:teamId', async (req, res) => {
       FROM Criteria c
       JOIN Competition_Criteria cc ON c.idCriteria = cc.Criteria_idCriteria
       WHERE cc.Competition_idCompetition = ?
-      ORDER BY c.CriteriaName
+      ORDER BY c.idCriteria
     `, [compId]);
 
         // Оценки судьи
@@ -983,11 +995,6 @@ app.post('/api/judge/team/:teamId', async (req, res) => {
         console.error('❌ /api/judge/team/:id (POST) error:', err);
         res.status(500).json({ error: 'Ошибка при получении данных команды' });
     }
-});
-
-app.post('/api/judge/comment', async (req, res) => {
-    const { teamId, comment, judgeId } = req.body;
-    // Обновляет только Commentary, без затрагивания Grades/Results
 });
 
 // Запуск сервера

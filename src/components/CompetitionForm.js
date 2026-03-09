@@ -123,7 +123,7 @@ export default function CompetitionForm() {
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 <div>
                     <label htmlFor="CompetitionName" style={{ display: 'block', marginBottom: '4px', fontWeight: '500' }}>
-                        Название соревнования *
+                        Название соревнования
                     </label>
                     <input
                         id="CompetitionName"
@@ -143,7 +143,7 @@ export default function CompetitionForm() {
 
                 <div>
                     <label htmlFor="CompetitionStartDate" style={{ display: 'block', marginBottom: '4px', fontWeight: '500' }}>
-                        Дата начала *
+                        Дата начала
                     </label>
                     <input
                         id="CompetitionStartDate"
@@ -163,7 +163,7 @@ export default function CompetitionForm() {
 
                 <div>
                     <label htmlFor="CompetitionEndDate" style={{ display: 'block', marginBottom: '4px', fontWeight: '500' }}>
-                        Дата окончания *
+                        Дата окончания
                     </label>
                     <input
                         id="CompetitionEndDate"

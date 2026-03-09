@@ -7,11 +7,12 @@ function JudgeDashboard() {
     const [loading, setLoading] = useState(true);
     const [message, setMessage] = useState({ type: '', text: '' });
     const [errors, setErrors] = useState({});
-    const [savedStatus, setSavedStatus] = useState({}); // teamId → 'saved' | 'error' | 'pending' | 'unsaved'
+    const [savedStatus, setSavedStatus] = useState({});
     const [commentModal, setCommentModal] = useState({ open: false, teamId: null, value: '' });
     const [taskModalOpen, setTaskModalOpen] = useState(false);
     const [taskData, setTaskData] = useState(null);
     const [loadingTask, setLoadingTask] = useState(false);
+    const [expandedDescriptions, setExpandedDescriptions] = useState({}); // ✅ для раскрытия описаний
     const modalRef = useRef(null);
 
     const user = JSON.parse(localStorage.getItem('user'));
@@ -30,7 +31,7 @@ function JudgeDashboard() {
                 setTeams(data.teams || []);
                 setCriteria(data.criteria || []);
 
-                // ДОБАВЛЕНО: используем totalScore (а не ResultsTotalScore) для инициализации статуса
+                // Используем totalScore (а не ResultsTotalScore) для инициализации статуса
                 const status = {};
                 data.teams?.forEach(team => {
                     status[team.id] = team.totalScore != null ? 'saved' : 'unsaved';
@@ -85,11 +86,9 @@ function JudgeDashboard() {
         setSavedStatus(prev => ({ ...prev, [teamId]: 'unsaved' }));
     };
 
-    // ДОБАВЛЕНО: очистка ошибки при вводе (все обработчики теперь чистят свои ошибки)
+    // ДОБАВЛЕНО: очистка ошибки при вводе
     const handleGradeChange = (teamId, critId, value) => {
         updateCriteriaGrade(teamId, critId, value);
-
-        // Очистка ошибки для этого критерия при вводе
         const errorKey = `grade-${teamId}-${critId}`;
         if (errors[errorKey]) {
             setErrors(prev => {
@@ -102,8 +101,6 @@ function JudgeDashboard() {
 
     const handleInstructionChange = (teamId, checked) => {
         updateTeamField(teamId, 'instruction', checked);
-
-        // Очистка ошибки для "Наличие инструкции"
         const errorKey = `instruction-${teamId}`;
         if (errors[errorKey]) {
             setErrors(prev => {
@@ -116,8 +113,6 @@ function JudgeDashboard() {
 
     const handleCoreFuncChange = (teamId, value) => {
         updateTeamField(teamId, 'coreFunc', value);
-
-        // Очистка ошибки для основной функциональности
         const errorKey = `core-${teamId}`;
         if (errors[errorKey]) {
             setErrors(prev => {
@@ -130,8 +125,6 @@ function JudgeDashboard() {
 
     const handleAddFuncChange = (teamId, value) => {
         updateTeamField(teamId, 'addFunc', value);
-
-        // Очистка ошибки для доп. функциональности
         const errorKey = `add-${teamId}`;
         if (errors[errorKey]) {
             setErrors(prev => {
@@ -145,21 +138,19 @@ function JudgeDashboard() {
     const validateTeam = (team) => {
         const newErrors = {};
 
-        // Валидация критериев — динамически по maxScore
         for (const crit of criteria) {
             const grade = team.criteriaGrades?.[crit.id];
             if (grade === '' || grade == null) {
                 newErrors[`grade-${team.id}-${crit.id}`] = 'Обязательно';
             } else {
                 const num = Number(grade);
-                const maxScore = crit.Competition_CriteriaMaxScore; // ДОБАВЛЕНО: динамический максимум
+                const maxScore = crit.Competition_CriteriaMaxScore;
                 if (isNaN(num) || num < 0 || num > maxScore) {
-                    newErrors[`grade-${team.id}-${crit.id}`] = `0–${maxScore}`; // ДОБАВЛЕНО: подстановка maxScore
+                    newErrors[`grade-${team.id}-${crit.id}`] = `0–${maxScore}`;
                 }
             }
         }
 
-        // Валидация основной функциональности
         if (team.coreFunc === '' || team.coreFunc == null) {
             newErrors[`core-${team.id}`] = 'Обязательно';
         } else {
@@ -169,7 +160,6 @@ function JudgeDashboard() {
             }
         }
 
-        // Валидация доп. функциональности
         if (team.addFunc === '' || team.addFunc == null) {
             newErrors[`add-${team.id}`] = 'Обязательно';
         } else {
@@ -266,6 +256,7 @@ function JudgeDashboard() {
         <div style={{ padding: '20px', fontFamily: 'Inter, sans-serif' }}>
             <h1 style={{ fontSize: '24px', marginBottom: '16px' }}>Оценка команд</h1>
 
+            {/* Кнопка "Посмотреть задание" */}
             <div style={{ marginBottom: '20px' }}>
                 <button
                     type="button"
@@ -321,7 +312,52 @@ function JudgeDashboard() {
                         {/* Критерии */}
                         {criteria.map(crit => (
                             <tr key={crit.id}>
-                                <td style={{ padding: '10px', borderBottom: '1px solid #F3F4F6' }}>{crit.CriteriaName}</td>
+                                {/* Ячейка с названием критерия + стрелочка */}
+                                <td style={{ padding: '10px', borderBottom: '1px solid #F3F4F6' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                        <span>{crit.CriteriaName}</span>
+                                        <button
+                                            type="button"
+                                            onClick={() => setExpandedDescriptions(prev => ({
+                                                ...prev,
+                                                [crit.id]: !prev[crit.id]
+                                            }))}
+                                            style={{
+                                                background: 'none',
+                                                border: 'none',
+                                                color: '#9CA3AF',
+                                                fontSize: '14px',
+                                                cursor: 'pointer',
+                                                width: '20px',
+                                                height: '20px',
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center'
+                                            }}
+                                            aria-label={expandedDescriptions[crit.id] ? 'Свернуть описание' : 'Показать описание'}
+                                        >
+                                            {expandedDescriptions[crit.id] ? '▼' : '▶'}
+                                        </button>
+                                    </div>
+
+                                    {/* Раскрывающееся описание */}
+                                    {expandedDescriptions[crit.id] && (
+                                        <div style={{
+                                            marginTop: '8px',
+                                            padding: '8px 12px',
+                                            backgroundColor: '#F9FAFB',
+                                            borderRadius: '4px',
+                                            fontSize: '13px',
+                                            color: '#6B7280',
+                                            lineHeight: '1.5',
+                                            borderLeft: '4px solid #D1D5DB'
+                                        }}>
+                                            {teams[0]?.criteriaDescriptions?.[crit.id] || 'Описание не задано'}
+                                        </div>
+                                    )}
+                                </td>
+
+                                {/* Оценки по командам */}
                                 {teams.map(team => {
                                     const errorKey = `grade-${team.id}-${crit.id}`;
                                     return (
@@ -329,7 +365,7 @@ function JudgeDashboard() {
                                             <input
                                                 type="number"
                                                 min="0"
-                                                max={crit.Competition_CriteriaMaxScore} // ДОБАВЛЕНО: динамический max
+                                                max={crit.Competition_CriteriaMaxScore}
                                                 value={team.criteriaGrades?.[crit.id] ?? ''}
                                                 onChange={(e) => handleGradeChange(team.id, crit.id, e.target.value)}
                                                 onBlur={() => handleGradeChange(team.id, crit.id, team.criteriaGrades?.[crit.id] ?? '')}
@@ -487,7 +523,7 @@ function JudgeDashboard() {
                             ))}
                         </tr>
 
-                        {/* Кнопка "Сохранить" — под каждой командой */}
+                        {/* Кнопка "Сохранить" */}
                         <tr>
                             <td style={{ padding: '10px', borderBottom: '1px solid #F3F4F6' }}></td>
                             {teams.map(team => {
