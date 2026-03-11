@@ -8,7 +8,7 @@ function JudgeDashboard() {
     const [message, setMessage] = useState({ type: '', text: '' });
     const [errors, setErrors] = useState({});
     const [savedStatus, setSavedStatus] = useState({});
-    const [commentModal, setCommentModal] = useState({ open: false, teamId: null, value: '' });
+    const [commentModal, setCommentModal] = useState({ open: false, teamId: null, teamName: '', value: '' });
     const [taskModalOpen, setTaskModalOpen] = useState(false);
     const [taskData, setTaskData] = useState(null);
     const [loadingTask, setLoadingTask] = useState(false);
@@ -46,6 +46,23 @@ function JudgeDashboard() {
 
         if (judgeId) fetchEvaluationData();
     }, [judgeId]);
+
+    // Группировка критериев по типу (обязательные/дополнительные)
+    const getGroupedCriteria = () => {
+        const mandatory = [];
+        const optional = [];
+
+        criteria.forEach(crit => {
+            // weight = 1 - обязательный, weight = 0 - дополнительный
+            if (crit.Competition_CriteriaWeight === 1) {
+                mandatory.push(crit);
+            } else {
+                optional.push(crit);
+            }
+        });
+
+        return { mandatory, optional };
+    };
 
     const loadTask = async () => {
         setLoadingTask(true);
@@ -211,22 +228,23 @@ function JudgeDashboard() {
         }
     };
 
-    const openCommentModal = (teamId, currentComment) => {
-        setCommentModal({ open: true, teamId, value: currentComment || '' });
+    const openCommentModal = (teamId, teamName, currentComment) => {
+        setCommentModal({
+            open: true,
+            teamId,
+            teamName,
+            value: currentComment || ''
+        });
     };
 
     const saveComment = async () => {
         const { teamId, value } = commentModal;
         try {
-            const response = await fetch('http://localhost:5000/api/judge/evaluate', {
+            const response = await fetch('http://localhost:5000/api/judge/comment', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     teamId,
-                    criteriaGrades: teams.find(t => t.id === teamId)?.criteriaGrades || {},
-                    instruction: teams.find(t => t.id === teamId)?.instruction || false,
-                    coreFunc: teams.find(t => t.id === teamId)?.coreFunc || '',
-                    addFunc: teams.find(t => t.id === teamId)?.addFunc || '',
                     comment: value,
                     judgeId
                 })
@@ -235,7 +253,7 @@ function JudgeDashboard() {
             if (response.ok) {
                 updateTeamField(teamId, 'comment', value);
                 showMessage('success', 'Комментарий сохранён');
-                setCommentModal({ open: false, teamId: null, value: '' });
+                setCommentModal({ open: false, teamId: null, teamName: '', value: '' });
             } else {
                 throw new Error();
             }
@@ -246,7 +264,7 @@ function JudgeDashboard() {
 
     const closeModal = (e) => {
         if (modalRef.current && !modalRef.current.contains(e.target)) {
-            setCommentModal({ open: false, teamId: null, value: '' });
+            setCommentModal({ open: false, teamId: null, teamName: '', value: '' });
         }
     };
 
@@ -301,6 +319,10 @@ function JudgeDashboard() {
                             <th style={{ textAlign: 'left', padding: '12px', borderBottom: '2px solid #E5E7EB', backgroundColor: '#F9FAFB' }}>
                                 Критерии
                             </th>
+                            {/* НОВЫЙ СТОЛБЕЦ: Максимальный балл */}
+                            <th style={{ textAlign: 'center', padding: '12px', borderBottom: '2px solid #E5E7EB', backgroundColor: '#F9FAFB' }}>
+                                Макс. балл
+                            </th>
                             {teams.map(team => (
                                 <th key={team.id} style={{ textAlign: 'center', padding: '12px', borderBottom: '2px solid #E5E7EB', backgroundColor: '#F9FAFB' }}>
                                     {team.name}
@@ -309,92 +331,232 @@ function JudgeDashboard() {
                         </tr>
                         </thead>
                         <tbody>
-                        {/* Критерии */}
-                        {criteria.map(crit => (
-                            <tr key={crit.id}>
-                                {/* Ячейка с названием критерия + стрелочка */}
-                                <td style={{ padding: '10px', borderBottom: '1px solid #F3F4F6' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <span>{crit.CriteriaName}</span>
-                                        <button
-                                            type="button"
-                                            onClick={() => setExpandedDescriptions(prev => ({
-                                                ...prev,
-                                                [crit.id]: !prev[crit.id]
-                                            }))}
-                                            style={{
-                                                background: 'none',
-                                                border: 'none',
-                                                color: '#9CA3AF',
-                                                fontSize: '14px',
-                                                cursor: 'pointer',
-                                                width: '20px',
-                                                height: '20px',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                justifyContent: 'center'
-                                            }}
-                                            aria-label={expandedDescriptions[crit.id] ? 'Свернуть описание' : 'Показать описание'}
-                                        >
-                                            {expandedDescriptions[crit.id] ? '▼' : '▶'}
-                                        </button>
-                                    </div>
+                        {/* Обязательные критерии */}
+                        {getGroupedCriteria().mandatory.length > 0 && (
+                            <>
+                                <tr>
+                                    <td colSpan={2 + teams.length} style={{
+                                        padding: '8px 12px',
+                                        backgroundColor: '#F3F4F6',
+                                        fontWeight: 'bold',
+                                        fontSize: '13px',
+                                        color: '#4B5563',
+                                        borderTop: '2px solid #E5E7EB',
+                                        borderBottom: '2px solid #E5E7EB'
+                                    }}>
+                                        Обязательные:
+                                    </td>
+                                </tr>
+                                {getGroupedCriteria().mandatory.map(crit => (
+                                    <tr key={crit.id}>
+                                        {/* Ячейка с названием критерия + стрелочка */}
+                                        <td style={{ padding: '10px', borderBottom: '1px solid #F3F4F6' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                <span>{crit.CriteriaName}</span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setExpandedDescriptions(prev => ({
+                                                        ...prev,
+                                                        [crit.id]: !prev[crit.id]
+                                                    }))}
+                                                    style={{
+                                                        background: 'none',
+                                                        border: 'none',
+                                                        color: '#9CA3AF',
+                                                        fontSize: '14px',
+                                                        cursor: 'pointer',
+                                                        width: '20px',
+                                                        height: '20px',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center'
+                                                    }}
+                                                    aria-label={expandedDescriptions[crit.id] ? 'Свернуть описание' : 'Показать описание'}
+                                                >
+                                                    {expandedDescriptions[crit.id] ? '▼' : '▶'}
+                                                </button>
+                                            </div>
 
-                                    {/* Раскрывающееся описание */}
-                                    {expandedDescriptions[crit.id] && (
-                                        <div style={{
-                                            marginTop: '8px',
-                                            padding: '8px 12px',
-                                            backgroundColor: '#F9FAFB',
-                                            borderRadius: '4px',
-                                            fontSize: '13px',
-                                            color: '#6B7280',
-                                            lineHeight: '1.5',
-                                            borderLeft: '4px solid #D1D5DB'
-                                        }}>
-                                            {teams[0]?.criteriaDescriptions?.[crit.id] || 'Описание не задано'}
-                                        </div>
-                                    )}
-                                </td>
-
-                                {/* Оценки по командам */}
-                                {teams.map(team => {
-                                    const errorKey = `grade-${team.id}-${crit.id}`;
-                                    return (
-                                        <td key={`${team.id}-${crit.id}`} style={{ padding: '10px', borderBottom: '1px solid #F3F4F6', textAlign: 'center' }}>
-                                            <input
-                                                type="number"
-                                                min="0"
-                                                max={crit.Competition_CriteriaMaxScore}
-                                                value={team.criteriaGrades?.[crit.id] ?? ''}
-                                                onChange={(e) => handleGradeChange(team.id, crit.id, e.target.value)}
-                                                onBlur={() => handleGradeChange(team.id, crit.id, team.criteriaGrades?.[crit.id] ?? '')}
-                                                style={{
-                                                    width: '60px',
-                                                    height: '36px',
-                                                    padding: '0 4px 0 16px',
-                                                    border: errors[errorKey] ? '1px solid #EF4444' : '1px solid #D1D5DB',
+                                            {/* Раскрывающееся описание */}
+                                            {expandedDescriptions[crit.id] && (
+                                                <div style={{
+                                                    marginTop: '8px',
+                                                    padding: '8px 12px',
+                                                    backgroundColor: '#F9FAFB',
                                                     borderRadius: '4px',
-                                                    textAlign: 'center',
-                                                    fontSize: '14px',
-                                                    lineHeight: '36px',
-                                                    boxSizing: 'border-box',
-                                                    appearance: 'textfield'
-                                                }}
-                                                onWheel={(e) => e.target.blur()}
-                                            />
-                                            {errors[errorKey] && (
-                                                <div style={{ fontSize: '12px', color: '#EF4444', marginTop: '4px' }}>{errors[errorKey]}</div>
+                                                    fontSize: '13px',
+                                                    color: '#6B7280',
+                                                    lineHeight: '1.5',
+                                                    borderLeft: '4px solid #D1D5DB'
+                                                }}>
+                                                    {teams[0]?.criteriaDescriptions?.[crit.id] || 'Описание не задано'}
+                                                </div>
                                             )}
                                         </td>
-                                    );
-                                })}
-                            </tr>
-                        ))}
+
+                                        {/* НОВОЕ: Максимальный балл */}
+                                        <td style={{
+                                            padding: '10px',
+                                            borderBottom: '1px solid #F3F4F6',
+                                            textAlign: 'center',
+                                            fontWeight: '500',
+                                            color: '#4B5563'
+                                        }}>
+                                            {crit.Competition_CriteriaMaxScore}
+                                        </td>
+
+                                        {/* Оценки по командам */}
+                                        {teams.map(team => {
+                                            const errorKey = `grade-${team.id}-${crit.id}`;
+                                            return (
+                                                <td key={`${team.id}-${crit.id}`} style={{ padding: '10px', borderBottom: '1px solid #F3F4F6', textAlign: 'center' }}>
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        max={crit.Competition_CriteriaMaxScore}
+                                                        value={team.criteriaGrades?.[crit.id] ?? ''}
+                                                        onChange={(e) => handleGradeChange(team.id, crit.id, e.target.value)}
+                                                        onBlur={() => handleGradeChange(team.id, crit.id, team.criteriaGrades?.[crit.id] ?? '')}
+                                                        style={{
+                                                            width: '60px',
+                                                            height: '36px',
+                                                            padding: '0 4px 0 16px',
+                                                            border: errors[errorKey] ? '1px solid #EF4444' : '1px solid #D1D5DB',
+                                                            borderRadius: '4px',
+                                                            textAlign: 'center',
+                                                            fontSize: '14px',
+                                                            lineHeight: '36px',
+                                                            boxSizing: 'border-box',
+                                                            appearance: 'textfield'
+                                                        }}
+                                                        onWheel={(e) => e.target.blur()}
+                                                    />
+                                                    {errors[errorKey] && (
+                                                        <div style={{ fontSize: '12px', color: '#EF4444', marginTop: '4px' }}>{errors[errorKey]}</div>
+                                                    )}
+                                                </td>
+                                            );
+                                        })}
+                                    </tr>
+                                ))}
+                            </>
+                        )}
+
+                        {/* Дополнительные критерии */}
+                        {getGroupedCriteria().optional.length > 0 && (
+                            <>
+                                <tr>
+                                    <td colSpan={2 + teams.length} style={{
+                                        padding: '8px 12px',
+                                        backgroundColor: '#F3F4F6',
+                                        fontWeight: 'bold',
+                                        fontSize: '13px',
+                                        color: '#4B5563',
+                                        borderTop: '2px solid #E5E7EB',
+                                        borderBottom: '2px solid #E5E7EB'
+                                    }}>
+                                        Дополнительные:
+                                    </td>
+                                </tr>
+                                {getGroupedCriteria().optional.map(crit => (
+                                    <tr key={crit.id}>
+                                        {/* Ячейка с названием критерия + стрелочка */}
+                                        <td style={{ padding: '10px', borderBottom: '1px solid #F3F4F6' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                <span>{crit.CriteriaName}</span>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setExpandedDescriptions(prev => ({
+                                                        ...prev,
+                                                        [crit.id]: !prev[crit.id]
+                                                    }))}
+                                                    style={{
+                                                        background: 'none',
+                                                        border: 'none',
+                                                        color: '#9CA3AF',
+                                                        fontSize: '14px',
+                                                        cursor: 'pointer',
+                                                        width: '20px',
+                                                        height: '20px',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center'
+                                                    }}
+                                                    aria-label={expandedDescriptions[crit.id] ? 'Свернуть описание' : 'Показать описание'}
+                                                >
+                                                    {expandedDescriptions[crit.id] ? '▼' : '▶'}
+                                                </button>
+                                            </div>
+
+                                            {/* Раскрывающееся описание */}
+                                            {expandedDescriptions[crit.id] && (
+                                                <div style={{
+                                                    marginTop: '8px',
+                                                    padding: '8px 12px',
+                                                    backgroundColor: '#F9FAFB',
+                                                    borderRadius: '4px',
+                                                    fontSize: '13px',
+                                                    color: '#6B7280',
+                                                    lineHeight: '1.5',
+                                                    borderLeft: '4px solid #D1D5DB'
+                                                }}>
+                                                    {teams[0]?.criteriaDescriptions?.[crit.id] || 'Описание не задано'}
+                                                </div>
+                                            )}
+                                        </td>
+
+                                        {/* НОВОЕ: Максимальный балл */}
+                                        <td style={{
+                                            padding: '10px',
+                                            borderBottom: '1px solid #F3F4F6',
+                                            textAlign: 'center',
+                                            fontWeight: '500',
+                                            color: '#4B5563'
+                                        }}>
+                                            {crit.Competition_CriteriaMaxScore}
+                                        </td>
+
+                                        {/* Оценки по командам */}
+                                        {teams.map(team => {
+                                            const errorKey = `grade-${team.id}-${crit.id}`;
+                                            return (
+                                                <td key={`${team.id}-${crit.id}`} style={{ padding: '10px', borderBottom: '1px solid #F3F4F6', textAlign: 'center' }}>
+                                                    <input
+                                                        type="number"
+                                                        min="0"
+                                                        max={crit.Competition_CriteriaMaxScore}
+                                                        value={team.criteriaGrades?.[crit.id] ?? ''}
+                                                        onChange={(e) => handleGradeChange(team.id, crit.id, e.target.value)}
+                                                        onBlur={() => handleGradeChange(team.id, crit.id, team.criteriaGrades?.[crit.id] ?? '')}
+                                                        style={{
+                                                            width: '60px',
+                                                            height: '36px',
+                                                            padding: '0 4px 0 16px',
+                                                            border: errors[errorKey] ? '1px solid #EF4444' : '1px solid #D1D5DB',
+                                                            borderRadius: '4px',
+                                                            textAlign: 'center',
+                                                            fontSize: '14px',
+                                                            lineHeight: '36px',
+                                                            boxSizing: 'border-box',
+                                                            appearance: 'textfield'
+                                                        }}
+                                                        onWheel={(e) => e.target.blur()}
+                                                    />
+                                                    {errors[errorKey] && (
+                                                        <div style={{ fontSize: '12px', color: '#EF4444', marginTop: '4px' }}>{errors[errorKey]}</div>
+                                                    )}
+                                                </td>
+                                            );
+                                        })}
+                                    </tr>
+                                ))}
+                            </>
+                        )}
 
                         {/* Итоговый процент */}
                         <tr>
                             <td style={{ padding: '10px', borderBottom: '1px solid #F3F4F6', fontWeight: 'bold' }}>Итоговый процент</td>
+                            <td style={{ padding: '10px', borderBottom: '1px solid #F3F4F6' }}></td> {/* Пустая ячейка под макс. балл */}
                             {teams.map(team => {
                                 const total = Object.values(team.criteriaGrades || {}).reduce((sum, g) => sum + (Number(g) || 0), 0);
                                 return (
@@ -408,6 +570,7 @@ function JudgeDashboard() {
                         {/* Инструкция */}
                         <tr>
                             <td style={{ padding: '10px', borderBottom: '1px solid #F3F4F6' }}>Наличие инструкции</td>
+                            <td style={{ padding: '10px', borderBottom: '1px solid #F3F4F6' }}></td> {/* Пустая ячейка под макс. балл */}
                             {teams.map(team => (
                                 <td key={`instr-${team.id}`} style={{ padding: '10px', borderBottom: '1px solid #F3F4F6', textAlign: 'center' }}>
                                     <input
@@ -423,6 +586,7 @@ function JudgeDashboard() {
                         {/* Основная функциональность */}
                         <tr>
                             <td style={{ padding: '10px', borderBottom: '1px solid #F3F4F6' }}>Основная функциональность (0–5)</td>
+                            <td style={{ padding: '10px', borderBottom: '1px solid #F3F4F6' }}></td> {/* Пустая ячейка под макс. балл */}
                             {teams.map(team => {
                                 const errorKey = `core-${team.id}`;
                                 return (
@@ -458,6 +622,7 @@ function JudgeDashboard() {
                         {/* Доп. функциональность */}
                         <tr>
                             <td style={{ padding: '10px', borderBottom: '1px solid #F3F4F6' }}>Доп. функциональность (0–5)</td>
+                            <td style={{ padding: '10px', borderBottom: '1px solid #F3F4F6' }}></td> {/* Пустая ячейка под макс. балл */}
                             {teams.map(team => {
                                 const errorKey = `add-${team.id}`;
                                 return (
@@ -493,6 +658,7 @@ function JudgeDashboard() {
                         {/* Итоговая оценка */}
                         <tr>
                             <td style={{ padding: '10px', borderBottom: '1px solid #F3F4F6', fontWeight: 'bold' }}>Итоговая оценка</td>
+                            <td style={{ padding: '10px', borderBottom: '1px solid #F3F4F6' }}></td> {/* Пустая ячейка под макс. балл */}
                             {teams.map(team => (
                                 <td key={`final-${team.id}`} style={{ padding: '10px', borderBottom: '1px solid #F3F4F6', textAlign: 'center' }}>
                                     —
@@ -503,11 +669,12 @@ function JudgeDashboard() {
                         {/* Комментарий */}
                         <tr>
                             <td style={{ padding: '10px', borderBottom: '1px solid #F3F4F6' }}>Комментарий</td>
+                            <td style={{ padding: '10px', borderBottom: '1px solid #F3F4F6' }}></td> {/* Пустая ячейка под макс. балл */}
                             {teams.map(team => (
                                 <td key={`comment-${team.id}`} style={{ padding: '10px', borderBottom: '1px solid #F3F4F6', textAlign: 'center' }}>
                                     <button
                                         type="button"
-                                        onClick={() => openCommentModal(team.id, team.comment)}
+                                        onClick={() => openCommentModal(team.id, team.name, team.comment)}
                                         style={{
                                             background: 'none',
                                             border: '1px solid #D1D5DB',
@@ -526,6 +693,7 @@ function JudgeDashboard() {
                         {/* Кнопка "Сохранить" */}
                         <tr>
                             <td style={{ padding: '10px', borderBottom: '1px solid #F3F4F6' }}></td>
+                            <td style={{ padding: '10px', borderBottom: '1px solid #F3F4F6' }}></td> {/* Пустая ячейка под макс. балл */}
                             {teams.map(team => {
                                 const status = savedStatus[team.id] || 'unsaved';
                                 let btnText, btnStyle;
@@ -601,7 +769,7 @@ function JudgeDashboard() {
                         }}
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <h3 style={{ margin: 0, fontSize: '18px', marginBottom: '12px' }}>Комментарий</h3>
+                        <h3 style={{ margin: 0, fontSize: '18px', marginBottom: '12px' }}>Комментарий команде "{commentModal.teamName}"</h3>
                         <textarea
                             value={commentModal.value}
                             onChange={(e) => setCommentModal(prev => ({ ...prev, value: e.target.value }))}
@@ -632,7 +800,7 @@ function JudgeDashboard() {
                                 Сохранить
                             </button>
                             <button
-                                onClick={() => setCommentModal({ open: false, teamId: null, value: '' })}
+                                onClick={() => setCommentModal({ open: false, teamId: null, teamName: '', value: '' })}
                                 style={{
                                     backgroundColor: '#F3F4F6',
                                     color: '#4B5563',

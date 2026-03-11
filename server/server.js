@@ -718,7 +718,8 @@ app.post('/api/judge/teams', async (req, res) => {
             SELECT
                 cc.idCompetition_Criteria AS id,
                 c.CriteriaName,
-                cc.Competition_CriteriaMaxScore
+                cc.Competition_CriteriaMaxScore,
+                cc.Competition_CriteriaWeight
             FROM Criteria c
                      JOIN Competition_Criteria cc ON c.idCriteria = cc.Criteria_idCriteria
             WHERE cc.Competition_idCompetition = ?
@@ -868,7 +869,33 @@ app.post('/api/judge/evaluate', async (req, res) => {
                 );
             }
 
-            // 4. Обновляем/создаём комментарий
+            await connection.commit();
+            connection.release();
+            res.json({ message: 'Оценка сохранена' });
+        } catch (err) {
+            await connection.rollback();
+            connection.release();
+            throw err;
+        }
+    } catch (err) {
+        console.error('❌ /api/judge/evaluate error:', err);
+        res.status(500).json({ error: 'Ошибка при сохранении оценки' });
+    }
+});
+
+// === РОУТ: Сохранить только комментарий (без изменения оценок) ===
+app.post('/api/judge/comment', async (req, res) => {
+    const { teamId, comment, judgeId } = req.body;
+
+    if (!teamId || !judgeId) {
+        return res.status(400).json({ error: 'Не указан ID команды или судьи' });
+    }
+
+    try {
+        const connection = await pool.getConnection();
+
+        try {
+            // Проверяем, есть ли уже комментарий от этого судьи для этой команды
             const [existingComment] = await connection.execute(
                 'SELECT idCommentary FROM Commentary WHERE Judge_idJudge = ? AND Team_idTeam = ?',
                 [judgeId, teamId]
@@ -876,11 +903,13 @@ app.post('/api/judge/evaluate', async (req, res) => {
 
             if (comment?.trim()) {
                 if (existingComment.length > 0) {
+                    // Обновляем существующий комментарий
                     await connection.execute(
                         'UPDATE Commentary SET CommentaryText = ? WHERE idCommentary = ?',
                         [comment.trim(), existingComment[0].idCommentary]
                     );
                 } else {
+                    // Создаём новый комментарий
                     await connection.execute(
                         'INSERT INTO Commentary (CommentaryText, Judge_idJudge, Team_idTeam) VALUES (?, ?, ?)',
                         [comment.trim(), judgeId, teamId]
@@ -893,17 +922,15 @@ app.post('/api/judge/evaluate', async (req, res) => {
                 }
             }
 
-            await connection.commit();
             connection.release();
-            res.json({ message: 'Оценка сохранена' });
+            res.json({ message: 'Комментарий сохранён' });
         } catch (err) {
-            await connection.rollback();
             connection.release();
             throw err;
         }
     } catch (err) {
-        console.error('❌ /api/judge/evaluate error:', err);
-        res.status(500).json({ error: 'Ошибка при сохранении оценки' });
+        console.error('❌ /api/judge/comment error:', err);
+        res.status(500).json({ error: 'Ошибка при сохранении комментария' });
     }
 });
 
