@@ -412,7 +412,7 @@ app.post('/api/criteria', async (req, res) => {
     }
 });
 
-// === РОУТ: Удалить критерий (и все его Competition_Criteria) ===
+// === РОУТ: Удалить критерий (и все его Competition_Criteria и связанные Grades) ===
 app.delete('/api/criteria/:id', async (req, res) => {
     const { id } = req.params;
 
@@ -421,13 +421,27 @@ app.delete('/api/criteria/:id', async (req, res) => {
         await connection.beginTransaction();
 
         try {
-            // Сначала удаляем Competition_Criteria (дочерние)
+            // 1. Сначала получаем все idCompetition_Criteria для этого критерия
+            const [compCriteria] = await connection.execute(
+                'SELECT idCompetition_Criteria FROM Competition_Criteria WHERE Criteria_idCriteria = ?',
+                [id]
+            );
+
+            // 2. Удаляем все оценки, которые ссылаются на эти Competition_Criteria
+            for (const row of compCriteria) {
+                await connection.execute(
+                    'DELETE FROM Grades WHERE Competition_Criteria_idCompetition_Criteria = ?',
+                    [row.idCompetition_Criteria]
+                );
+            }
+
+            // 3. Теперь удаляем Competition_Criteria
             await connection.execute(
                 'DELETE FROM Competition_Criteria WHERE Criteria_idCriteria = ?',
                 [id]
             );
 
-            // Потом — сам критерий
+            // 4. И наконец удаляем сам критерий
             await connection.execute(
                 'DELETE FROM Criteria WHERE idCriteria = ?',
                 [id]
@@ -806,7 +820,7 @@ app.post('/api/judge/teams', async (req, res) => {
 
 // === РОУТ: Сохранить оценку команды ===
 app.post('/api/judge/evaluate', async (req, res) => {
-    const { teamId, criteriaGrades, instruction, coreFunc, addFunc, comment, judgeId } = req.body;
+    const { teamId, criteriaGrades, instruction, coreFunc, addFunc, finalGrade, judgeId } = req.body;
 
     if (!teamId || !judgeId) {
         return res.status(400).json({ error: 'Не указан ID команды или судьи' });
@@ -856,16 +870,20 @@ app.post('/api/judge/evaluate', async (req, res) => {
             if (existingResult.length > 0) {
                 await connection.execute(
                     `UPDATE Results 
-         SET ResultsTotalScore = ?, ResultsInstruction = ?, ResultsScoreForCoreFunc = ?, ResultsScoreForAddFunc = ?
-         WHERE idResults = ?`,
-                    [totalScore, instruction ? 1 : 0, coreFunc || 0, addFunc || 0, existingResult[0].idResults]
+                    SET ResultsTotalScore = ?, 
+                        ResultsInstruction = ?, 
+                        ResultsScoreForCoreFunc = ?, 
+                        ResultsScoreForAddFunc = ?,
+                        ResultsFinalGrade = ?
+                    WHERE idResults = ?`,
+                    [totalScore, instruction ? 1 : 0, coreFunc || 0, addFunc || 0, finalGrade, existingResult[0].idResults]
                 );
             } else {
                 await connection.execute(
                     `INSERT INTO Results 
          (ResultsTotalScore, ResultsInstruction, ResultsScoreForCoreFunc, ResultsScoreForAddFunc, ResultsFinalGrade, Competition_idCompetition, Team_idTeam)
-         VALUES (?, ?, ?, ?, 0, ?, ?)`,
-                    [totalScore, instruction ? 1 : 0, coreFunc || 0, addFunc || 0, compId, teamId]
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+                    [totalScore, instruction ? 1 : 0, coreFunc || 0, addFunc || 0, finalGrade, compId, teamId]
                 );
             }
 
