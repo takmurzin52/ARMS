@@ -1014,7 +1014,7 @@ function JudgeDashboard() {
                     >
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
                             <h2 style={{ margin: 0, fontSize: '20px' }}>
-                                Расчёт итоговой оценки
+                                Расчёт итоговой оценки команды "{teams.find(t => t.id === calculationModal.teamId)?.name || '...'}"
                             </h2>
                             <button
                                 onClick={() => setCalculationModal({ open: false, teamId: null, details: null })}
@@ -1037,7 +1037,7 @@ function JudgeDashboard() {
                             {/* Левая колонка - расчёты */}
                             <div style={{ flex: 1 }}>
                                 <div style={{ marginBottom: '16px' }}>
-                                    <h3 style={{ fontSize: '16px', marginBottom: '8px' }}>Критерии</h3>
+                                    <h3 style={{ fontSize: '16px', marginBottom: '8px' }}>1. Критерии</h3>
                                     {calculationModal.details.criteria.map((c, i) => (
                                         <div key={i} style={{ marginBottom: '6px', fontSize: '14px' }}>
                                             <strong>{c.name}</strong>: {c.grade}/{c.max} →

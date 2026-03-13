@@ -298,7 +298,7 @@ function Register() {
                     <button
                         type="submit"
                         style={{
-                            backgroundColor: '#10B981',
+                            backgroundColor: '#3FBA55',
                             color: 'white',
                             border: 'none',
                             padding: '12px 24px',
@@ -310,8 +310,8 @@ function Register() {
                             width: '100%',
                             marginTop: '16px'
                         }}
-                        onMouseOver={(e) => e.target.style.backgroundColor = '#059669'}
-                        onMouseOut={(e) => e.target.style.backgroundColor = '#10B981'}
+                        onMouseOver={(e) => e.target.style.backgroundColor = '#40A153'}
+                        onMouseOut={(e) => e.target.style.backgroundColor = '#3FBA55'}
                     >
                         Зарегистрироваться
                     </button>

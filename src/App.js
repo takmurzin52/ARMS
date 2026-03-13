@@ -4,6 +4,7 @@ import Login from './Login';
 import Register from './Register';
 import SecretaryDashboard from './pages/SecretaryDashboard';
 import JudgeDashboard from './pages/JudgeDashboard';
+import HeadJudgeDashboard from "./pages/HeadJudgeDashboard";
 
 // Защита маршрутов с проверкой роли
 const ProtectedRoute = ({ children, allowedRoles }) => {
@@ -22,63 +23,22 @@ const Unauthorized = () => (
     <div style={{ padding: '40px', textAlign: 'center' }}>
         <h2>Доступ запрещён</h2>
         <p>У вас нет прав для просмотра этой страницы.</p>
-        <button onClick={() => window.location.href = '/'} style={{
-            marginTop: '16px',
-            padding: '8px 16px',
-            backgroundColor: '#4F46E5',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer'
-        }}>
+        <button
+            onClick={() => window.location.href = '/'}
+            style={{
+                marginTop: '16px',
+                padding: '8px 16px',
+                backgroundColor: '#4F46E5',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer'
+            }}
+        >
             Вернуться на главную
         </button>
     </div>
 );
-
-function App() {
-    return (
-        <Router>
-            <Routes>
-                <Route path="/" element={<Login />} />
-                <Route path="/register" element={<Register />} />
-
-                {/* Панель секретаря */}
-                <Route
-                    path="/dashboard"
-                    element={
-                        <ProtectedRoute allowedRoles={['Секретарь']}>
-                            <SecretaryDashboard />
-                        </ProtectedRoute>
-                    }
-                />
-
-                {/* Панель основного судьи */}
-                <Route
-                    path="/judge"
-                    element={
-                        <ProtectedRoute allowedRoles={['Основной судья']}>
-                            <JudgeDashboard />
-                        </ProtectedRoute>
-                    }
-                />
-
-                {/* Доступ запрещён */}
-                <Route path="/unauthorized" element={<Unauthorized />} />
-
-                {/* Перенаправление после входа */}
-                <Route
-                    path="/"
-                    element={
-                        <ProtectedRoute>
-                            <RedirectBasedOnRole />
-                        </ProtectedRoute>
-                    }
-                />
-            </Routes>
-        </Router>
-    );
-}
 
 // Автоматическое перенаправление после входа
 const RedirectBasedOnRole = () => {
@@ -92,5 +52,56 @@ const RedirectBasedOnRole = () => {
     }
     return <Navigate to="/unauthorized" replace />;
 };
+
+function App() {
+    return (
+        <Router>
+            <Routes>
+                {/* Публичные маршруты */}
+                <Route path="/" element={<Login />} />
+                <Route path="/register" element={<Register />} />
+
+                {/* Защищённые маршруты */}
+                <Route
+                    path="/dashboard"
+                    element={
+                        <ProtectedRoute allowedRoles={['Секретарь']}>
+                            <SecretaryDashboard />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/judge"
+                    element={
+                        <ProtectedRoute allowedRoles={['Основной судья']}>
+                            <JudgeDashboard />
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/chief"
+                    element={
+                        <ProtectedRoute allowedRoles={['Главный судья']}>
+                            <HeadJudgeDashboard />
+                        </ProtectedRoute>
+                    }
+                />
+
+                {/* Страница ошибки */}
+                <Route path="/unauthorized" element={<Unauthorized />} />
+
+                {/* Редирект после входа (если попали на / без авторизации — Login, иначе — по роли) */}
+                <Route
+                    path="*"
+                    element={
+                        <ProtectedRoute>
+                            <RedirectBasedOnRole />
+                        </ProtectedRoute>
+                    }
+                />
+            </Routes>
+        </Router>
+    );
+}
 
 export default App;

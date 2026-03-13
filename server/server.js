@@ -771,8 +771,8 @@ app.post('/api/judge/teams', async (req, res) => {
                     r.ResultsFinalGrade,
                     r.ResultsTotalScore
                 FROM Results r
-                WHERE r.Competition_idCompetition = ? AND r.Team_idTeam = ?
-            `, [compId, team.idTeam]);
+                WHERE r.Competition_idCompetition = ? AND r.Team_idTeam = ? AND r.Judge_idJudge = ?
+            `, [compId, team.idTeam, judgeId]);
             const teamResult = results[0] || {};
             const teamGrades = grades.filter(g => g.Team_idTeam === team.idTeam);
             const teamComment = comments.find(c => c.Team_idTeam === team.idTeam);
@@ -861,29 +861,31 @@ app.post('/api/judge/evaluate', async (req, res) => {
             // Сначала посчитаем сумму баллов из criteriaGrades
             const totalScore = Object.values(criteriaGrades).reduce((sum, grade) => sum + (Number(grade) || 0), 0);
 
-            // 3. Обновляем/создаём Results
+            // 3. Обновляем/создаём Results (с привязкой к судье)
             const [existingResult] = await connection.execute(
-                'SELECT idResults FROM Results WHERE Competition_idCompetition = ? AND Team_idTeam = ?',
-                [compId, teamId]
+                'SELECT idResults FROM Results WHERE Competition_idCompetition = ? AND Team_idTeam = ? AND Judge_idJudge = ?',
+                [compId, teamId, judgeId]
             );
 
             if (existingResult.length > 0) {
+                // Обновляем существующую запись
                 await connection.execute(
-                    `UPDATE Results 
-                    SET ResultsTotalScore = ?, 
-                        ResultsInstruction = ?, 
-                        ResultsScoreForCoreFunc = ?, 
-                        ResultsScoreForAddFunc = ?,
-                        ResultsFinalGrade = ?
-                    WHERE idResults = ?`,
+                    `UPDATE Results
+                     SET ResultsTotalScore = ?,
+                         ResultsInstruction = ?,
+                         ResultsScoreForCoreFunc = ?,
+                         ResultsScoreForAddFunc = ?,
+                         ResultsFinalGrade = ?
+                     WHERE idResults = ?`,
                     [totalScore, instruction ? 1 : 0, coreFunc || 0, addFunc || 0, finalGrade, existingResult[0].idResults]
                 );
             } else {
+                // Создаём новую запись
                 await connection.execute(
-                    `INSERT INTO Results 
-         (ResultsTotalScore, ResultsInstruction, ResultsScoreForCoreFunc, ResultsScoreForAddFunc, ResultsFinalGrade, Competition_idCompetition, Team_idTeam)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-                    [totalScore, instruction ? 1 : 0, coreFunc || 0, addFunc || 0, finalGrade, compId, teamId]
+                    `INSERT INTO Results
+                     (ResultsTotalScore, ResultsInstruction, ResultsScoreForCoreFunc, ResultsScoreForAddFunc, ResultsFinalGrade, Competition_idCompetition, Team_idTeam, Judge_idJudge)
+                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                    [totalScore, instruction ? 1 : 0, coreFunc || 0, addFunc || 0, finalGrade, compId, teamId, judgeId]
                 );
             }
 
@@ -1039,6 +1041,65 @@ app.post('/api/judge/team/:teamId', async (req, res) => {
     } catch (err) {
         console.error('❌ /api/judge/team/:id (POST) error:', err);
         res.status(500).json({ error: 'Ошибка при получении данных команды' });
+    }
+});
+
+// === РОУТ: Сводка для главного судьи ===
+app.get('/api/head-judge/summary', async (req, res) => {
+    try {
+        // 1. Активное соревнование
+        const [compRows] = await pool.execute('SELECT idCompetition FROM Competition WHERE IsActive = 1');
+        if (compRows.length === 0) {
+            return res.status(400).json({ error: 'Нет активного соревнования' });
+        }
+        const compId = compRows[0].idCompetition;
+
+        // 2. Все команды
+        const [teams] = await pool.execute(
+            'SELECT idTeam, TeamName FROM Team WHERE Competition_idCompetition = ? ORDER BY TeamName',
+            [compId]
+        );
+
+        // 3. Все основные судьи
+        const [judges] = await pool.execute(`
+          SELECT j.idJudge, j.JudgeSurname, j.JudgeName, j.JudgePatronymic
+          FROM Judge j
+          JOIN JudgeRole jr ON j.JudgeRole_idJudgeRole = jr.idJudgeRole
+          WHERE jr.JudgeRoleName = 'Основной судья'
+          ORDER BY j.JudgeSurname, j.JudgeName
+        `);
+
+        // 4. Все итоговые оценки (Results)
+        const [results] = await pool.execute(`
+          SELECT 
+            r.Team_idTeam,
+            r.Judge_idJudge,
+            r.ResultsFinalGrade
+          FROM Results r
+          WHERE r.Competition_idCompetition = ?
+        `, [compId]);
+
+        // Преобразуем results в map: { teamId: { judgeId: finalGrade } }
+        const resultMap = {};
+        results.forEach(row => {
+            if (!resultMap[row.Team_idTeam]) resultMap[row.Team_idTeam] = {};
+            resultMap[row.Team_idTeam][row.Judge_idJudge] = row.ResultsFinalGrade;
+        });
+
+        // Формируем финальную структуру
+        const summary = {
+            teams: teams.map(t => ({ id: t.idTeam, name: t.TeamName })),
+            judges: judges.map(j => ({
+                id: j.idJudge,
+                name: `${j.JudgeSurname} ${j.JudgeName}${j.JudgePatronymic ? ' ' + j.JudgePatronymic : ''}`
+            })),
+            matrix: resultMap // { teamId: { judgeId: grade } }
+        };
+
+        res.json(summary);
+    } catch (err) {
+        console.error('❌ /api/head-judge/summary error:', err);
+        res.status(500).json({ error: 'Ошибка при получении сводки' });
     }
 });
 

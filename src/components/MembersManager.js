@@ -169,67 +169,147 @@ export default function MembersManager() {
             </div>
 
             {/* Форма добавления */}
-            <form onSubmit={handleAddMember} style={{ marginBottom: '24px', padding: '16px', border: '1px solid #E5E7EB', borderRadius: '8px' }}>
-                <h3 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '12px' }}>Добавить участника</h3>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <form onSubmit={handleAddMember} style={{
+                marginBottom: '24px',
+                padding: '20px',
+                border: '1px solid #E5E7EB',
+                borderRadius: '8px',
+                backgroundColor: '#F9FAFB'
+            }}>
+                <h3 style={{ fontSize: '16px', fontWeight: '600', marginTop: '3px', marginBottom: '16px' }}>Добавить участника</h3>
+
+                <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: '1fr 1fr',
+                    gap: '16px',
+                    marginBottom: '20px'
+                }}>
                     <div>
-                        <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px' }}>Фамилия</label>
+                        <label style={{
+                            display: 'block',
+                            marginBottom: '6px',
+                            fontSize: '14px',
+                            fontWeight: '500',
+                            color: '#4B5563'
+                        }}>
+                            Фамилия
+                        </label>
                         <input
                             type="text"
                             value={newMember.surname}
                             onChange={(e) => handleInputChange('surname', e.target.value)}
                             required
-                            style={{ width: '100%', padding: '8px', border: '1px solid #D1D5DB', borderRadius: '4px' }}
+                            style={{
+                                width: '100%',
+                                padding: '10px 12px',
+                                border: '1px solid #D1D5DB',
+                                borderRadius: '6px',
+                                fontSize: '14px',
+                                boxSizing: 'border-box'
+                            }}
                         />
                     </div>
+
                     <div>
-                        <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px' }}>Имя</label>
+                        <label style={{
+                            display: 'block',
+                            marginBottom: '6px',
+                            fontSize: '14px',
+                            fontWeight: '500',
+                            color: '#4B5563'
+                        }}>
+                            Имя
+                        </label>
                         <input
                             type="text"
                             value={newMember.name}
                             onChange={(e) => handleInputChange('name', e.target.value)}
                             required
-                            style={{ width: '100%', padding: '8px', border: '1px solid #D1D5DB', borderRadius: '4px' }}
+                            style={{
+                                width: '100%',
+                                padding: '10px 12px',
+                                border: '1px solid #D1D5DB',
+                                borderRadius: '6px',
+                                fontSize: '14px',
+                                boxSizing: 'border-box'
+                            }}
                         />
                     </div>
+
                     <div>
-                        <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px' }}>Email</label>
+                        <label style={{
+                            display: 'block',
+                            marginBottom: '6px',
+                            fontSize: '14px',
+                            fontWeight: '500',
+                            color: '#4B5563'
+                        }}>
+                            Email
+                        </label>
                         <input
                             type="email"
                             value={newMember.email}
                             onChange={(e) => handleInputChange('email', e.target.value)}
                             required
-                            style={{ width: '100%', padding: '8px', border: '1px solid #D1D5DB', borderRadius: '4px' }}
+                            style={{
+                                width: '100%',
+                                padding: '10px 12px',
+                                border: '1px solid #D1D5DB',
+                                borderRadius: '6px',
+                                fontSize: '14px',
+                                boxSizing: 'border-box'
+                            }}
                         />
                     </div>
+
                     <div>
-                        <label style={{ display: 'block', marginBottom: '4px', fontSize: '14px' }}>Роль в команде</label>
+                        <label style={{
+                            display: 'block',
+                            marginBottom: '6px',
+                            fontSize: '14px',
+                            fontWeight: '500',
+                            color: '#4B5563'
+                        }}>
+                            Роль в команде
+                        </label>
                         <input
                             type="text"
                             value={newMember.role}
                             onChange={(e) => handleInputChange('role', e.target.value)}
                             placeholder="Капитан, разработчик и т.д."
                             required
-                            style={{ width: '100%', padding: '8px', border: '1px solid #D1D5DB', borderRadius: '4px' }}
+                            style={{
+                                width: '100%',
+                                padding: '10px 12px',
+                                border: '1px solid #D1D5DB',
+                                borderRadius: '6px',
+                                fontSize: '14px',
+                                boxSizing: 'border-box'
+                            }}
                         />
                     </div>
                 </div>
-                <button
-                    type="submit"
-                    disabled={saving}
-                    style={{
-                        marginTop: '16px',
-                        backgroundColor: saving ? '#A5B4FC' : '#4F46E5',
-                        color: 'white',
-                        border: 'none',
-                        padding: '10px 20px',
-                        borderRadius: '4px',
-                        cursor: 'pointer',
-                        fontWeight: '500'
-                    }}
-                >
-                    {saving ? 'Добавление...' : 'Добавить участника'}
-                </button>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+                    <button
+                        type="submit"
+                        disabled={saving}
+                        style={{
+                            backgroundColor: saving ? '#A5B4FC' : '#4F46E5',
+                            color: 'white',
+                            border: 'none',
+                            padding: '10px 24px',
+                            borderRadius: '6px',
+                            cursor: 'pointer',
+                            fontWeight: '500',
+                            fontSize: '14px',
+                            transition: 'background-color 0.2s',
+                            marginBottom: '3px'
+                        }}
+                    >
+                        {saving ? 'Добавление...' : 'Добавить участника'}
+                    </button>
+                </div>
             </form>
 
             {/* Таблица участников */}
