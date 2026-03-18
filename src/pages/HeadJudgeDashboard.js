@@ -30,6 +30,11 @@ export default function HeadJudgeDashboard() {
         fetchSummary();
     }, []);
 
+    const handleExportPDF = () => {
+        // Проверяем, что браузер поддерживает download (опционально)
+        window.open('http://localhost:5000/api/export/results-pdf', '_blank');
+    };
+
     if (loading) return <div style={{ padding: '20px' }}>Загрузка...</div>;
     if (error) return <div style={{ padding: '20px', color: '#EF4444' }}>Ошибка: {error}</div>;
 
@@ -190,6 +195,23 @@ export default function HeadJudgeDashboard() {
                             * При равенстве баллов команды делят соответствующее место
                         </p>
                     )}
+                    <div style={{ marginTop: '20px', textAlign: 'center' }}>
+                        <button
+                            type="button"
+                            onClick={handleExportPDF}
+                            style={{
+                                backgroundColor: '#4F46E5',
+                                color: 'white',
+                                border: 'none',
+                                padding: '8px 16px',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                fontSize: '14px'
+                            }}
+                        >
+                            Скачать результаты в формате PDF
+                        </button>
+                    </div>
                 </>
             )}
         </div>

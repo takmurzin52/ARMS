@@ -1103,6 +1103,190 @@ app.get('/api/head-judge/summary', async (req, res) => {
     }
 });
 
+// === РОУТ: Экспорт результатов в PDF (исправленный формат) ===
+const PDFDocument = require('pdfkit');
+
+app.get('/api/export/results-pdf', async (req, res) => {
+    try {
+        // 1. Получаем активное соревнование
+        const [compRows] = await pool.execute('SELECT * FROM Competition WHERE IsActive = 1');
+        if (compRows.length === 0) {
+            return res.status(400).json({ error: 'Нет активного соревнования' });
+        }
+        const comp = compRows[0];
+
+        // 2. Получаем команды
+        const [teams] = await pool.execute(
+            'SELECT idTeam, TeamName FROM Team WHERE Competition_idCompetition = ? ORDER BY TeamName',
+            [comp.idCompetition]
+        );
+
+        // 3. Получаем все итоговые оценки
+        const [results] = await pool.execute(`
+            SELECT 
+                r.Team_idTeam,
+                r.ResultsFinalGrade
+            FROM Results r
+            WHERE r.Competition_idCompetition = ?
+        `, [comp.idCompetition]);
+
+        // 4. Считаем сумму баллов для каждой команды
+        const teamScores = {};
+        results.forEach(row => {
+            if (!teamScores[row.Team_idTeam]) teamScores[row.Team_idTeam] = 0;
+            teamScores[row.Team_idTeam] += row.ResultsFinalGrade || 0;
+        });
+
+        // 5. Группируем команды по сумме баллов
+        const teamsWithScores = teams
+            .map(team => ({
+                name: team.TeamName,
+                total: teamScores[team.idTeam] || 0
+            }))
+            .filter(team => team.total > 0); // Убираем команды без оценок
+
+        // Сортируем по убыванию
+        teamsWithScores.sort((a, b) => b.total - a.total);
+
+        // Группируем по сумме
+        const groupedByScore = {};
+        teamsWithScores.forEach(team => {
+            if (!groupedByScore[team.total]) {
+                groupedByScore[team.total] = [];
+            }
+            groupedByScore[team.total].push(team.name);
+        });
+
+        // Преобразуем в массив для таблицы
+        const rankedGroups = Object.entries(groupedByScore)
+            .map(([score, teamNames]) => ({
+                score: parseFloat(score),
+                teams: teamNames
+            }))
+            .sort((a, b) => b.score - a.score);
+
+        // 6. Создаем PDF документ (книжная ориентация, достаточно)
+        const doc = new PDFDocument({
+            margin: 50,
+            size: 'A4',
+            layout: 'portrait' // Книжная ориентация
+        });
+
+        // Регистрируем шрифты с поддержкой кириллицы
+        doc.registerFont('Arial', 'C:\\Windows\\Fonts\\arial.ttf');
+        doc.registerFont('Arial-Bold', 'C:\\Windows\\Fonts\\arialbd.ttf');
+
+        // Устанавливаем заголовки для скачивания
+        res.setHeader('Content-Type', 'application/pdf');
+
+        // Формируем имя файла с русскими символами
+        const fileName = `Итоги_${comp.CompetitionName}.pdf`;
+        const encodedFileName = encodeURIComponent(fileName).replace(/['()]/g, escape);
+        res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodedFileName}`);
+
+        // Pipe PDF в ответ
+        doc.pipe(res);
+
+        // --- ЗАГОЛОВОК ---
+        doc.fontSize(18)
+            .font('Arial-Bold')
+            .text(comp.CompetitionName, { align: 'center' });
+
+        doc.fontSize(11)
+            .font('Arial')
+            .text(`Дата проведения: ${new Date(comp.CompetitionStartDate).toLocaleDateString('ru-RU')} – ${new Date(comp.CompetitionEndDate).toLocaleDateString('ru-RU')}`,
+                { align: 'center' });
+
+        doc.moveDown(3);
+
+        // --- ТАБЛИЦА РЕЗУЛЬТАТОВ ---
+        doc.fontSize(14)
+            .font('Arial-Bold')
+            .text('Итоговый рейтинг команд', { align: 'left' });
+
+        doc.moveDown();
+
+        // Заголовки таблицы
+        const tableTop = doc.y;
+        const col1X = 50;      // Место
+        const col2X = 120;     // Команда
+        const col3X = 350;     // Сумма баллов
+
+        doc.fontSize(11)
+            .font('Arial-Bold')
+            .text('Место', col1X, tableTop)
+            .text('Команда', col2X, tableTop)
+            .text('Сумма баллов', col3X, tableTop);
+
+        // Линия под заголовками
+        doc.moveTo(col1X - 5, tableTop + 20)
+            .lineTo(col3X + 80, tableTop + 20)
+            .stroke();
+
+        let currentY = tableTop + 30;
+
+        // Строки таблицы
+        doc.font('Arial');
+
+        rankedGroups.forEach((group, index) => {
+            const place = index + 1;
+            const teamsText = group.teams.join(', ');
+
+            // Проверяем, не выходит ли текст за пределы страницы
+            if (currentY > 700) {
+                doc.addPage();
+                currentY = 50;
+            }
+
+            doc.text(place.toString(), col1X, currentY);
+
+            // Для названий команд может быть многострочный текст
+            doc.text(teamsText, col2X, currentY, {
+                width: col3X - col2X - 20,
+                lineBreak: true
+            });
+
+            doc.text(group.score.toFixed(2), col3X, currentY);
+
+            // Вычисляем высоту строки с учетом возможного переноса текста команды
+            const teamTextHeight = doc.heightOfString(teamsText, {
+                width: col3X - col2X - 20
+            });
+            currentY += Math.max(25, teamTextHeight + 10);
+        });
+
+        // --- ДАТА ФОРМИРОВАНИЯ ---
+        const today = new Date();
+        const dateStr = today.toLocaleDateString('ru-RU', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric'
+        });
+        const timeStr = today.toLocaleTimeString('ru-RU', {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+        });
+
+        doc.moveDown(2);
+        doc.fontSize(9)
+            .font('Arial')
+            .text(`Дата формирования отчёта: ${dateStr} ${timeStr}`, {
+                align: 'right',
+                color: '#666666'
+            });
+
+        // Завершаем документ
+        doc.end();
+
+        console.log('✅ PDF успешно сгенерирован');
+
+    } catch (err) {
+        console.error('❌ Ошибка генерации PDF:', err);
+        res.status(500).json({ error: 'Ошибка при генерации PDF' });
+    }
+});
+
 // Запуск сервера
 app.listen(PORT, () => {
     console.log(`✅ Бэкенд запущен на http://localhost:${PORT}`);
